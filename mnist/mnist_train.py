@@ -7,15 +7,34 @@ from tqdm import tqdm
 from torchvision import transforms
 from torch.nn import CrossEntropyLoss
 from mnist import models
+import random
 
 def train(model, opt, criterion, modelname, epochs = 10, scheduler = None, schedulerMode = 'epoch'):
 
     model = model.cuda()
     criterion = criterion.cuda()
 
-    trainData = MNIST('./data/mnist', download = True, transform = transforms.ToTensor())
+    def randomTranslate(tensor):
+        tensor = tensor.squeeze()
+        a = torch.where(tensor > 0)
+        bd = [torch.min(a[0]), torch.min(a[1]), tensor.shape[0] - torch.max(a[0]),
+              tensor.shape[1] - torch.max(a[1])]
+        xt = random.randint(-bd[0], bd[2])
+        yt = random.randint(-bd[1], bd[3])
+        res = torch.zeros_like(tensor)
+        res[max(xt, 0):min(28, xt + 28), max(yt, 0):min(28, 28 + yt)] = \
+            tensor[max(0, -xt):min(28, 28 - xt), max(0, -yt):min(28, 28 - yt)]
+        return res[None, ...]
+
+    trans = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.RandomRotation(20),
+        transforms.Lambda(randomTranslate)
+    ])
+
+    trainData = MNIST('./data/mnist', download = True, transform = trans)
     trainLoader = DataLoader(trainData, batch_size = 32, shuffle = True, pin_memory = True)
-    valData = MNIST('./data/mnist', download = True, train = False, transform = transforms.ToTensor())
+    valData = MNIST('./data/mnist', download = True, train = False, transform = trans)
     valLoader = DataLoader(valData, batch_size = 32, shuffle = True, pin_memory = True)
 
     for epoch in range(epochs):

@@ -13,14 +13,13 @@ def val(modelname, ckpt):
     model = model.cuda()
 
     valData = MNIST('./data/mnist', download = True, train = False, transform = transforms.ToTensor())
-    valLoader = DataLoader(valData, batch_size = 32, shuffle = False, pin_memory = True)
+    valLoader = DataLoader(valData, batch_size = 1, shuffle = False, pin_memory = True)
 
     valProcess = tqdm(enumerate(valLoader), desc = f'Val', total = len(valLoader), ncols = 120)
     yPred = []
 
     with torch.no_grad():
         for i, (x, label) in valProcess:
-            print(x.shape)
             x = x.cuda()
             y = model(x)
             ynum = torch.argmax(y, dim = 1)
