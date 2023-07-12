@@ -11,9 +11,10 @@ def val(modelname, ckpt):
     model = models.getModel(modelname)
     model.load_state_dict(torch.load(ckpt))
     model = model.cuda()
+    model.eval()
 
     valData = MNIST('./data/mnist', download = True, train = False, transform = transforms.ToTensor())
-    valLoader = DataLoader(valData, batch_size = 1, shuffle = False, pin_memory = True)
+    valLoader = DataLoader(valData, batch_size = 32, shuffle = False, pin_memory = True)
 
     valProcess = tqdm(enumerate(valLoader), desc = f'Val', total = len(valLoader), ncols = 120)
     yPred = []

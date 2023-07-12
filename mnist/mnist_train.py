@@ -9,7 +9,7 @@ from torch.nn import CrossEntropyLoss
 from mnist import models
 import random
 
-def train(model, opt, criterion, modelname, epochs = 10, scheduler = None, schedulerMode = 'epoch'):
+def train(model, opt, criterion, modelname, epochs = 10, scheduler = None, schedulerMode = 'epoch', augmentation = True):
 
     model = model.cuda()
     criterion = criterion.cuda()
@@ -26,11 +26,14 @@ def train(model, opt, criterion, modelname, epochs = 10, scheduler = None, sched
             tensor[max(0, -xt):min(28, 28 - xt), max(0, -yt):min(28, 28 - yt)]
         return res[None, ...]
 
-    trans = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.RandomRotation(20),
-        transforms.Lambda(randomTranslate)
-    ])
+    if augmentation:
+        trans = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.RandomRotation(20),
+            transforms.Lambda(randomTranslate)
+        ])
+    else:
+        trans = transforms.ToTensor()
 
     trainData = MNIST('./data/mnist', download = True, transform = trans)
     trainLoader = DataLoader(trainData, batch_size = 32, shuffle = True, pin_memory = True)
