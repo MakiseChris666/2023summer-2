@@ -1,4 +1,5 @@
-from torchvision.datasets.mnist import MNIST
+import cv2
+from torchvision.datasets.mnist import MNIST, EMNIST
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -9,7 +10,8 @@ from torch.nn import CrossEntropyLoss
 from mnist import models
 import random
 
-def train(model, opt, criterion, modelname, epochs = 10, scheduler = None, schedulerMode = 'epoch', augmentation = True):
+def train(model, opt, criterion, modelname, epochs = 10, scheduler = None, schedulerMode = 'epoch', augmentation = True,
+          dataset = 'mnist'):
 
     model = model.cuda()
     criterion = criterion.cuda()
@@ -35,9 +37,18 @@ def train(model, opt, criterion, modelname, epochs = 10, scheduler = None, sched
     else:
         trans = transforms.ToTensor()
 
-    trainData = MNIST('./data/mnist', download = True, transform = trans)
+    if dataset == 'mnist':
+        trainData = MNIST('./data/mnist', download = True, transform = trans)
+        valData = MNIST('./data/mnist', download = True, train = False, transform = trans)
+        num_classes = 10
+    elif dataset == 'emnist':
+        trainData = EMNIST('./data/emnist', download = True, transform = trans, split = 'balanced')
+        valData = EMNIST('./data/emnist', download = True, train = False, transform = trans, split = 'balanced')
+        num_classes = 47
+    else:
+        raise NotImplementedError
+
     trainLoader = DataLoader(trainData, batch_size = 32, shuffle = True, pin_memory = True)
-    valData = MNIST('./data/mnist', download = True, train = False, transform = trans)
     valLoader = DataLoader(valData, batch_size = 32, shuffle = True, pin_memory = True)
 
     for epoch in range(epochs):
@@ -47,7 +58,7 @@ def train(model, opt, criterion, modelname, epochs = 10, scheduler = None, sched
             x = x.cuda()
             label = label.cuda()
             y = model(x)
-            label = F.one_hot(label, num_classes = 10).float()
+            label = F.one_hot(label, num_classes = num_classes).float()
             loss = criterion(y, label)
             lossSum += loss.item()
             process.set_postfix_str('loss = %.6f' % (lossSum / (i + 1)))

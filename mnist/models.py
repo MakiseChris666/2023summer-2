@@ -11,12 +11,12 @@ _MODELS = {
     'vgg16': vgg16
 }
 
-def getModel(name):
+def getModel(name, num_classes = 10):
     backbone = _MODELS[name]
 
     model = nn.Sequential(
         nn.Conv2d(1, 3, 1),
-        backbone(num_classes = 10)
+        backbone(num_classes = num_classes)
     )
 
     if name.startswith('vgg'):
