@@ -26,6 +26,6 @@ model.load_state_dict(torch.load('./ckpt/vgg19'))
 model.eval()
 model = model.cuda()
 
-resImg = det.detectFromRois2(mask, model, needPreproccess = False, windows = np.array([[50, 20]]))
+resImg, _ = det.detectFromRois2(mask, model, needPreproccess = False, windows = np.array([[50, 20]]))
 cv.imshow('', resImg)
 cv.waitKey(0)

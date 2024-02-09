@@ -3,10 +3,9 @@ import numpy as np
 
 from detect import window
 import torch
-from torchvision.ops.boxes import nms
+from torchvision.ops.boxes import nms, box_iou
 from tqdm import tqdm
 import torch.nn.functional as F
-from sklearn.cluster import DBSCAN
 
 templateVecs = []
 templateVecsLen = []
@@ -106,15 +105,32 @@ class UnionSet:
         return self.fa[a] == a
 
 @torch.no_grad()
-def detectFromRois2(img, model, thres = 0.9, needPreproccess = True, windows = None):
+def detectFromRois2(img, model, thres = 0.9, needPreproccess = True, windows = None, verbose = True, weights = None,
+                    combine = True):
     device = next(model.parameters()).device
+    resImg = img.copy()
     if needPreproccess:
         img = preprocess(img) / 255
     else:
         img = img / 255
     if windows is None:
         windows = window.generate()
-    rois, locs = window.getWindows(img, windows)
+    rois, locs, roiweights = window.getWindows(img, windows, weights = weights)
+    # for i in range(rois.shape[0]):
+    #     roi = rois[i][0]
+    #     x, y = np.where(roi > 0)
+    #     x = x.reshape((-1, 1))
+    #     y = y.reshape((-1, 1))
+    #     coor = np.concatenate([x, y], axis = 1)
+    #     center = np.mean(coor, axis = 0)
+    #     center = (np.array([13.5, 13.5]) - center).astype('int32')
+    #
+    #     res = np.zeros_like(roi)
+    #     res[max(center[0], 0):min(28, center[0] + 28), max(center[1], 0):min(28, 28 + center[1])] = \
+    #         roi[max(0, -center[0]):min(28, 28 - center[0]), max(0, -center[1]):min(28, 28 - center[1])]
+    #     cv.imshow('', (res * 255).astype('uint8'))
+    #
+    #     rois[i] = res[None, ...]
 
     rois = torch.Tensor(rois)
     rois = rois.to(device)
@@ -126,27 +142,41 @@ def detectFromRois2(img, model, thres = 0.9, needPreproccess = True, windows = N
 
     prob, num = torch.max(scores, dim = 1)
     prob[num == 7] = torch.sqrt(prob[num == 7])
+    prob = prob ** torch.Tensor(roiweights)
     selected = prob > thres
 
     prob = prob[selected]
     locsT = torch.Tensor(locs)[selected]
     nmsed = nms(locsT, prob, 0.1)
 
-    num = num[selected][nmsed].numpy()
-    rois = rois[selected][nmsed].cpu().numpy()
-    for r in rois:
-        cv.imshow('', (r[0] * 255).astype('uint8'))
-        cv.waitKey(0)
+    num = num[selected][nmsed]
+    locs = locsT[nmsed]
+
+    ious = box_iou(locs, locs)
+    f = torch.ones(len(num), dtype = torch.bool)
+    for i in range(len(num)):
+        for j in range(i + 1, len(num)):
+            if num[i] == num[j] and ious[i][j] > 0.05:
+                f[j] = False
+    locs = locs[f]
+    num = num[f]
+
+    if verbose:
+        rois = rois[selected][nmsed][f].cpu().numpy()
+        for r in rois:
+            cv.imshow('', (r[0] * 255).astype('uint8'))
+            cv.waitKey(0)
     print(num)
-    selected = selected.numpy()
-    locs = locs[selected][nmsed]
+    locs = locs.numpy().astype('int32')
+    num = num.numpy()
 
     us = UnionSet(locs.shape[0])
-    for i in range(locs.shape[0]):
-        for j in range(i + 1, locs.shape[0]):
-            if abs(locs[i][0] - locs[j][0]) < (locs[i][2] - locs[i][0] + locs[j][2] - locs[j][0]) / 2 * 1.5 \
-                and abs(locs[i][1] - locs[j][1]) < (locs[i][3] - locs[i][1] + locs[j][3] - locs[j][1]) / 2 * 1.5:
-                us.union(i, j)
+    if combine:
+        for i in range(locs.shape[0]):
+            for j in range(i + 1, locs.shape[0]):
+                if abs((locs[i][0] + locs[i][2]) / 2 - (locs[j][0] + locs[j][2]) / 2) < (locs[i][2] - locs[i][0] + locs[j][2] - locs[j][0]) / 2 * 1.2 \
+                    and abs((locs[i][1] + locs[i][3]) / 2 - (locs[j][1] + locs[j][3]) / 2) < (locs[i][3] - locs[i][1] + locs[j][3] - locs[j][1]) / 2 * 1.5:
+                    us.union(i, j)
 
     united = [[] for _ in range(locs.shape[0])]
     for i in range(locs.shape[0]):
@@ -168,11 +198,10 @@ def detectFromRois2(img, model, thres = 0.9, needPreproccess = True, windows = N
             bd[2] = max(bd[2], x[0][2])
         finalLocNum.append((np.array(bd), unum))
 
-    resImg = img.copy()
     # for loc in locs:
     #     cv.rectangle(resImg, (loc[1], loc[0]), (loc[3], loc[2]), color = (255, 0, 0))
     for loc, n in finalLocNum:
         cv.rectangle(resImg, (loc[1], loc[0]), (loc[3], loc[2]), color = (255, 0, 0))
         cv.putText(resImg, str(n), (loc[1], loc[0]), cv.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0))
         print(n)
-    return resImg
+    return resImg, finalLocNum

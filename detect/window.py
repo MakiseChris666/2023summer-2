@@ -14,11 +14,14 @@ def generate(minSize = 10, maxSize = 30, hwratio = 2.0, steps = 5, method = 'con
         raise NotImplementedError
 
 
-def getWindows(img, windows, stride = 4):
+def getWindows(img, windows, stride = 4, weights = None):
+    if weights is None:
+        weights = [1] * len(windows)
     h, w = img.shape
     res = []
     loc = []
-    for window in windows:
+    resweights = []
+    for s, window in enumerate(windows):
         for i in range(0, h - int(window[0]), stride):
             for j in range(0, w - int(window[1]), stride):
                 roi = img[i:i + int(window[0]), j:j + int(window[1])]
@@ -29,6 +32,9 @@ def getWindows(img, windows, stride = 4):
                     continue
                 res.append(roi[None, None, ...])
                 loc.append([i, j, i + int(window[0]), j + int(window[1])])
+                resweights.append(weights[s])
+
     res = np.concatenate(res, axis = 0)
     loc = np.array(loc)
-    return res, loc
+    resweights = np.array(resweights)
+    return res, loc, resweights

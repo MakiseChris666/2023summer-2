@@ -11,7 +11,7 @@ from mnist import models
 import random
 
 def train(model, opt, criterion, modelname, epochs = 10, scheduler = None, schedulerMode = 'epoch', augmentation = True,
-          dataset = 'mnist'):
+          dataset = 'mnist', batch_size = 32):
 
     model = model.cuda()
     criterion = criterion.cuda()
@@ -48,8 +48,8 @@ def train(model, opt, criterion, modelname, epochs = 10, scheduler = None, sched
     else:
         raise NotImplementedError
 
-    trainLoader = DataLoader(trainData, batch_size = 32, shuffle = True, pin_memory = True)
-    valLoader = DataLoader(valData, batch_size = 32, shuffle = True, pin_memory = True)
+    trainLoader = DataLoader(trainData, batch_size = batch_size, shuffle = True, pin_memory = True)
+    valLoader = DataLoader(valData, batch_size = batch_size, shuffle = True, pin_memory = True)
 
     for epoch in range(epochs):
         lossSum = 0

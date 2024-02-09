@@ -6,11 +6,11 @@ from torchvision import transforms
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score, recall_score, precision_score
 
-def val(modelname, ckpt):
+def val(modelname, ckpt, device = 'cuda'):
 
     model = models.getModel(modelname)
     model.load_state_dict(torch.load(ckpt))
-    model = model.cuda()
+    model = model.to(device)
     model.eval()
 
     valData = MNIST('./data/mnist', download = True, train = False, transform = transforms.ToTensor())
@@ -21,7 +21,7 @@ def val(modelname, ckpt):
 
     with torch.no_grad():
         for i, (x, label) in valProcess:
-            x = x.cuda()
+            x = x.to(device)
             y = model(x)
             ynum = torch.argmax(y, dim = 1)
             yPred.append(ynum)
